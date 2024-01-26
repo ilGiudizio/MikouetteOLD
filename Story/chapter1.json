@@ -1,0 +1,23 @@
+{
+    "bg" : "./Assets/BG/street.png",
+    "characters" : ["Miku;out_left", "Jotaro;chara2"],
+    "script" : [
+        {
+            "settings" : "Miku;normal",
+            "actions" : [
+                "@enter_left",
+                "Hello !",
+                "I'm the number 1 princess in the world !",
+                "Seeeekaaaaaaidee ichiban ooohiiimeee saaamaaaaaaaaaaaaaaaaa !"
+            ]
+        },
+        {
+            "settings" : "Jotaro;normal",
+            "actions" : [
+                "Yare yare daze.",
+                "Ore no entiendo nani de qué shaberu !",
+                "@leave_right"
+            ]
+        }
+    ]
+}
