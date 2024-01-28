@@ -2,6 +2,7 @@ import pygame
 import os
 import os.path
 import json
+import fparser
 
 #print(pygame.font.get_fonts())
 
@@ -10,36 +11,97 @@ SCREENSIZE = (1280, 720)
 NAME_FONT = None
 SAY_FONT = None
 
+POSITION = dict()
+with open("./Params/positions.json") as file:
+    POSITION = json.load(file)
+
+COLOR = dict()
+with open("./Assets/Chara/colors.json") as file:
+    COLOR = json.load(file)
+
 window = pygame.display.set_mode(SCREENSIZE)
 
 SCREEN_RECT = window.get_rect()
 
 uiDebug = dict()
 
-charaZBuffer = list()    # Stores what's drawn, in which order
+charaZBuffer = list()    # Stores a reference to what's drawn, in which order
 uiZBuffer = list()
 textBuffer = list() # Stores every text drawn on screen
 
-
 class Scene():
     bg = None
-    data = list()
-    speechBuffer = list() # Stores all the speaches in the chapter
-    speech_index = 0
-    lineBuffer = list() # Stores all the lines of the current speech
-    line_index = 0
+    data = dict()
+    GOTO = ""   # Where to go next
+    SBID = "0"    # Stores the current Story Block ID
+    CHARACTERS = tuple()
+    characterBuffer = dict()    # Stores the current characters
+    scriptBuffer = list() # Stores all the speaches in the current SBID
+    script_index = int()
     
-    def load(chapter : str):
-        with open(f"./Story/{chapter}") as chapterFile:
-            Scene.data = json.load(chapterFile)
+    def load(chapter : str, SBID = "0"):
+        Scene.script_index = 0  # DO NOT REMOVE (it also resets it when changing Chapters)
+        fparser.Parser.loadChapter(f"./Story/{chapter}.fvnc")
         
-        Scene.speechBuffer = Scene.data["script"]
+        Scene.data = fparser.chapter[SBID]
+        Scene.GOTO = Scene.data["GOTO"]
+        Scene.scriptBuffer = Scene.data["SCRIPT"]
+        Scene.loadCharacters()
         
-        Scene.bg = pygame.image.load(Scene.data["bg"]).convert()
+        Scene.bg = pygame.image.load(Scene.data["BG"]).convert()
         window.blit(Scene.bg, (0, 0))
     
     def advance():
-        Scene.advance = True
+        Scene.script_index += 1
+        if Scene.script_index >= len(Scene.scriptBuffer):    # If we reach the end of the SBID
+            if "NEXT" in Scene.data.keys(): # If we reach the end of the Chapter
+                Scene.load(Scene.data["NEXT"][0], Scene.data["NEXT"][1])
+            else:   # Otherwise, we just read the next Story Block
+                Scene.nextStoryBlock()
+    
+    def nextStoryBlock():
+        Scene.script_index = 0  # resets the Script Index
+        Scene.data = fparser.chapter[Scene.GOTO[0][0]]  # GOTO : [(SBID, Transition)]
+        Scene.GOTO = Scene.data["GOTO"]        
+        Scene.scriptBuffer = Scene.data["SCRIPT"]
+        print(Scene.data["SCRIPT"])
+        if len(Scene.data["CHARACTERS"]) != 0:  # If the Character List changed
+            Scene.loadCharacters()
+        
+        Scene.bg = pygame.image.load(Scene.data["BG"]).convert()
+        window.blit(Scene.bg, (0, 0))
+    
+    def readScript():
+        scriptLine = Scene.scriptBuffer[Scene.script_index]
+        if type(scriptLine) == fparser.AbstractCharaAction:
+            Scene.characterBuffer[scriptLine.chara].set_expression(scriptLine.expression)
+            Scene.characterBuffer[scriptLine.chara].say(scriptLine.action)
+        elif type(scriptLine) == fparser.AbstractCharaLine:
+            Scene.characterBuffer[scriptLine.chara].set_expression(scriptLine.expression)
+            Scene.characterBuffer[scriptLine.chara].say(scriptLine.line)
+    
+    def loadCharacters():
+        previousCharaList = Scene.characterBuffer.keys()
+        abstractCharacters = Scene.data["CHARACTERS"]
+        newCharaList = [newChara[0] for newChara in abstractCharacters]
+        for oldChara in previousCharaList:
+            if not oldChara in newCharaList:    # Do we need to free the character
+                Scene.characterBuffer[oldChara].free()
+        
+        tmpCharacterBuffer = dict()
+        
+        for chara in abstractCharacters:
+            if chara[0] in previousCharaList:   # If in already exists, take the old one
+                tmpCharacterBuffer[chara[0]] = Scene.characterBuffer[chara[0]]
+                tmpCharacterBuffer[chara[0]].set_expression(chara[1])
+                tmpCharacterBuffer[chara[0]].set_pos(POSITION[chara[2]])
+            else:   # Otherwise, creat a new Chara Object
+                tmpCharacterBuffer[chara[0]] = Chara(chara[0], POSITION[chara[2]], COLOR[chara[0]], chara[1])
+            print(f"{chara[0]}.{chara[1]}")
+        
+        Scene.characterBuffer = tmpCharacterBuffer
+        
+        print(f"Active Character Objects : {Chara.count}")
     
     def update():     
         # The background is always drawn first
@@ -50,6 +112,7 @@ class Scene():
             window.blit(chara.sprite, chara.pos)
         
         # Then the UI
+        Scene.readScript()
         UI.update()
 
 class UIBox():
@@ -129,6 +192,7 @@ class UIElement():
         self.pos = self.pos.move(dx, dy)
 
 class Chara():
+    count = 0
     charaFolder = "./Assets/Chara/"
     name = str()
     expression = dict()
@@ -138,17 +202,15 @@ class Chara():
     rot = 0.0
     color = tuple()
     
-    def __init__(self, name : str, initPos = (80, 20), color = (255, 255, 255)) -> None:
+    def __init__(self, name : str, initPos = (80, 20), color = (255, 255, 255), expression = "normal") -> None:
         self.name = name
-        self.expression = {sprite.split('.')[0].split("_")[1] : f"{self.charaFolder}{name}/{sprite}" for sprite in os.listdir(self.charaFolder + name)}
+        self.expression = {sprite.split('.')[0].split("_")[1] : pygame.transform.rotozoom(pygame.image.load(f"{self.charaFolder}{name}/{sprite}").convert_alpha(), self.rot, self.size) for sprite in os.listdir(self.charaFolder + name)}
         self.color = color
+        self.sprite = self.expression[expression]
+        self.set_pos(initPos)
         
-        self.sprite = pygame.transform.rotozoom(pygame.image.load(self.expression["normal"]).convert_alpha(), self.rot, self.size)
-        self.pos = self.sprite.get_rect().move(initPos)
-        
-        charaZBuffer.append(self)
-        
-        self.update()
+        charaZBuffer.append(self)        
+        Chara.count += 1
     
     def __repr__(self):
         return self.name
@@ -157,8 +219,11 @@ class Chara():
         window.blit(self.sprite, self.pos)
     
     def set_expression(self, expression : str):
-        self.sprite = pygame.transform.rotozoom(pygame.image.load(self.expression[expression]).convert_alpha(), self.rot, self.size)
+        self.sprite = self.expression[expression]
         self.update()
+    
+    def set_pos(self, pos):
+        self.pos = self.sprite.get_rect().move(pos)
     
     def move(self, dx : int, dy : int):
         self.pos = self.pos.move(dx, dy)
@@ -168,6 +233,11 @@ class Chara():
         chara_name = NAME_FONT.render(self.name, True, self.color)
         # Structure : ((chara_name, pos), (text_box, pos))
         textBuffer.append(((chara_name, UIBox.center(UI.boxCharaName, chara_name)), (text_box, (180, 592))))
+    
+    def free(self):
+        charaZBuffer.remove(self)
+        Chara.count -= 1
+        del self
 
 class TextWrapper():
     def wrap_text(text, font, width):
