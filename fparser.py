@@ -3,12 +3,13 @@ import time
 chapter = dict()    # chapter[StoryBlockID] = StoryBlock
 """
 {
-    SBID_1 : {
+    "SBID_1" : {
         "BG" : path,
         "CHARACTERS": ((Chara1, expression, startPos), (Chara2, expression, startPos)),
         "SCRIPT": (
             (Chara1, expression, "@CharacterAction"),
             (Chara1, expression, "Hello")
+            ($Narrator, The Narrator doesn't speak in quotes)
         ),
         "GOTO": [
             (SBID, Transition) OR , (SBID, Label, {vars})
@@ -27,6 +28,13 @@ class StoryBlock():
         self.bg = bg
         self.chara = chara
         self.script = script
+
+class AbstractNarratorLine():
+    chara = "Narrator"
+    line = str()
+    
+    def __init__(self, line : str) -> None:
+        self.line = line
 
 class AbstractCharaAction():
     chara = str()
@@ -121,7 +129,7 @@ class Parser():
                                             tmpOParams = option[1].split(",")
                                             tmpOGOTO = tmpOParams.pop(0).strip(" ")
                                             if len(tmpOParams) != 0:    # aka if there are variables to assign
-                                                tmpOVar = dict()
+                                                tmpOVar = {}
                                                 for param in tmpOParams:
                                                     param = param.split("=")
                                                     tmpOVar[param[0].strip(" ")] = param[1].strip(" ")
@@ -139,7 +147,10 @@ class Parser():
                             tmpChara = tmpCharaSprite[0]
                             
                         case "\"":  # Speech Line
-                            tmpSBScript.append(AbstractCharaLine(tmpChara, tmpExpression[tmpChara], line))
+                            if tmpChara[0] == "$":  # In case it's the Narrator
+                                tmpSBScript.append(AbstractNarratorLine(line[1:-1])) # line[1:-1] because the Narrator doesn't speak with ""
+                            else:
+                                tmpSBScript.append(AbstractCharaLine(tmpChara, tmpExpression[tmpChara], line))
                         case "#":   # Comment
                             continue
             

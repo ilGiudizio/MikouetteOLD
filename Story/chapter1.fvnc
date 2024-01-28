@@ -8,12 +8,15 @@
 "I'm the number 1 princess in the world !"
 "Seeeekaaaaaaidee ichiban ooohiiimeee saaamaaaaaaaaaaaaaaaaa !"
 
+[$]
+"Hello, I'm the Narrator."
+
 [Jotaro.reflexion]
 "Yare yare daze."
 "Ore no entiendo nani de qué shaberu !"
 @leave_right
-@GOTO(1A, fade)
-#@CHOICE("Wait!" : 1A, interest=1;"Bye !" : 1B)
+#@GOTO(1A, fade)
+@CHOICE("Wait!" : 1A, interest=1; "Bye !" : 1B)
 
 
 |1A|
@@ -29,6 +32,8 @@
 |1B|
 [Miku]
 "Oh... He might be able to help me. Huuuhhh.. Hey, wait !"
+
+[Jotaro]
 "Yare yare daze..."
 @GOTO(2, fade)
 

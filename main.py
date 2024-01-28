@@ -4,6 +4,8 @@ import fafvn
 
 pygame.init()
 
+TIMER = pygame.time.Clock()
+
 fafvn.NAME_FONT = pygame.font.SysFont("comicsansms", 35)
 fafvn.SAY_FONT = pygame.font.SysFont("comicsansms", 30)
 
@@ -17,12 +19,17 @@ charaTextBox = fafvn.UIElement("./Assets/UI/CharaTextBox.png")
 keepRunning = True
 
 while keepRunning:
-    for event in pygame.event.get():
+    fafvn.eventList = pygame.event.get()
+    for event in fafvn.eventList:
         if event.type == QUIT:
             keepRunning = False
-        if event.type == pygame.KEYUP:
-            if event.key == pygame.K_SPACE:
-                fafvn.Scene.advance()
+        if fafvn.Scene.paused == False:
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                fafvn.Scene.advance()                    
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_SPACE:
+                    fafvn.Scene.advance()
 
+    fafvn.Scene.checkCollisions()
     fafvn.Scene.update()
     pygame.display.flip()
